@@ -1,0 +1,37 @@
+# Build output and third-party tools
+/artifacts/
+**/node_modules/
+**/classes/
+**/dex/
+**/build/
+*.apk
+*.idsig
+*.exe
+*.dll
+*.zip
+*.jar
+*.dex
+*.bin
+*.oat
+*.vdex
+*.art
+
+# Credentials, pairing, signing, raw snapshots
+**/router-settings.json
+**/display-pair.json
+**/display-pair.json.*
+**/.local-signing/
+*.pk8
+*.keystore
+*.jks
+*.pem
+*.p12
+.env
+.env.*
+private/
+*.log
+*.wrapped.sh
+*.out
+__pycache__/
+*.pyc
+.DS_Store

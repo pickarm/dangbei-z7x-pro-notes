@@ -1,0 +1,10 @@
+{
+  "key": "GENERATE_A_RANDOM_32_BYTE_BASE64_KEY_LOCALLY",
+  "device": "GENERATE_A_RANDOM_32_HEX_PAIRING_ID_LOCALLY",
+  "port": 45383,
+  "monitorMarker": "DISPLAY#SKG27A9#",
+  "projectorMarker": "DISPLAY#DBE0030#",
+  "laptopMarker": "DISPLAY#BOE0AC1#",
+  "computerSource": -999,
+  "systemSource": 0
+}

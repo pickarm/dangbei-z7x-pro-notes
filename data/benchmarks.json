@@ -1,0 +1,56 @@
+{
+  "description": "am start -W process cold starts; 3 samples per app; not a desktop smoothness benchmark",
+  "unit": "milliseconds",
+  "before": {
+    "com.dangbei.tvlauncher": {
+      "process_cold_start_ms": [
+        3008,
+        2776,
+        2833
+      ],
+      "median_ms": 2833
+    },
+    "com.chinasoul.bt": {
+      "process_cold_start_ms": [
+        1351,
+        994,
+        932
+      ],
+      "median_ms": 994
+    },
+    "com.netease.filmlytv": {
+      "process_cold_start_ms": [
+        1116,
+        1044,
+        1054
+      ],
+      "median_ms": 1054
+    }
+  },
+  "after_settled": {
+    "com.dangbei.tvlauncher": {
+      "process_cold_start_ms": [
+        2872,
+        2795,
+        2782
+      ],
+      "median_ms": 2795
+    },
+    "com.chinasoul.bt": {
+      "process_cold_start_ms": [
+        1151,
+        1031,
+        896
+      ],
+      "median_ms": 1031
+    },
+    "com.netease.filmlytv": {
+      "process_cold_start_ms": [
+        977,
+        986,
+        962
+      ],
+      "median_ms": 977
+    }
+  }
+}
