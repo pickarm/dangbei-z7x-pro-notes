@@ -4,7 +4,7 @@
 
 这不是通用刷机包，也不是“所有当贝机型通用”的一键优化脚本。设备按日常名称称为 Z7X PRO，但系统上报 **D7XPG / Product_mudanpro2 / goat_elegant**。实测环境为 **Android 13、固件 v6.11.3、32 位 ABI、约 2 GB 内存**。其他型号或固件需要重新核对接口。
 
-最后整理至 **2026-11-24**。从头阅读可先看[整段折腾总结](docs/09-conversation-summary.md)。
+最后整理至 **2026-11-24**。先看[当前结果总结](docs/09-conversation-summary.md)，完整的需求变化、早期尝试和失败路线见[对话回溯](docs/10-conversation-retrospective.md)。
 
 ## 我想解决的事
 
@@ -54,7 +54,8 @@ Windows 通过局域网读取投影仪的播放标志和当前源，两个条件
 7. [备份、恢复和已知边界](docs/07-recovery.md)
 8. [折腾时间线与失败尝试](docs/08-timeline.md)
 9. [整段折腾总结](docs/09-conversation-summary.md)
-10. [源码和构建说明](BUILDING.md)
+10. [从最初安装到 HDMI 2 的完整对话回溯](docs/10-conversation-retrospective.md)
+11. [源码和构建说明](BUILDING.md)
 
 ## 仓库里有什么
 
