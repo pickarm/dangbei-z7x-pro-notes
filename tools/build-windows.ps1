@@ -9,6 +9,6 @@ if (!(Test-Path -LiteralPath $compiler)) { throw '.NET Framework 4.x C# compiler
 New-Item -ItemType Directory -Force -Path $outputDir | Out-Null
 $sourceDir = Join-Path $repoRoot 'sources\windows-display-router'
 $outputFile = Join-Path $outputDir 'Projector-Display-Router.exe'
-& $compiler /nologo /target:winexe /optimize+ /r:System.Web.Extensions.dll "/out:$outputFile" (Join-Path $sourceDir 'DisplayConfig.cs') (Join-Path $sourceDir 'DisplayRouter.cs')
+& $compiler /nologo /target:winexe /optimize+ /r:System.Web.Extensions.dll /r:System.Runtime.Serialization.dll "/out:$outputFile" (Join-Path $sourceDir 'DisplayConfig.cs') (Join-Path $sourceDir 'DisplayRouter.cs')
 if ($LASTEXITCODE -ne 0) { throw 'Windows compilation failed' }
 Write-Output "Built (not started): $outputFile"

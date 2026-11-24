@@ -1,0 +1,44 @@
+'use strict';
+const flag='/data/local/codex-volume/enabled';
+const out=new File('/data/local/codex-volume/agent.log','w');
+function log(x){try{out.write(JSON.stringify(x)+'\n');out.flush();}catch(error){}}
+const access=new NativeFunction(Module.getGlobalExportByName('access'),'int',['pointer','int']);
+const flagPointer=Memory.allocUtf8String(flag);
+if(access(flagPointer,0)!==0)throw new Error('test not enabled');
+const lib=Process.enumerateModules().find(m=>m.findExportByName('MI_AOUT_SetVolumeDb')!==null);
+const address=lib.findExportByName('MI_AOUT_SetVolume');
+const original=new NativeFunction(address,'uint',['uint','uint','uint']);
+const setDb=new NativeFunction(lib.findExportByName('MI_AOUT_SetVolumeDb'),'uint',['uint','uint','pointer']);
+const getDb=new NativeFunction(lib.findExportByName('MI_AOUT_GetVolumeDb'),'uint',['uint','uint','pointer']);
+const handle=0x17000001,kind=4;
+let lastIndex=__INITIAL_INDEX__, count=0, active=true;
+if(lastIndex>100)throw new Error('invalid original index');
+function target(index){return Math.round((-75+(index-1)*75/99)*1000);}
+function apply(h,k,index){
+  if(index===0)return original(h,k,0);
+  const milli=target(index), whole=Math.trunc(milli/1000), fraction=milli-whole*1000;
+  const data=Memory.alloc(8);data.writeS32(whole);data.add(4).writeS32(fraction);
+  const status=setDb(h,k,data);
+  if(count++<200){
+    const actual=Memory.alloc(8), readStatus=getDb(h,k,actual);
+    log({index,target:[whole,fraction],status,readStatus,actual:[actual.readS32(),actual.add(4).readS32()]});
+  }
+  return status;
+}
+const callback=new NativeCallback((h,k,index)=>{
+  if(!active||h!==handle||k!==kind||index>100)return original(h,k,index);
+  lastIndex=index;
+  try{return apply(h,k,index);}catch(error){log({event:'error',message:String(error)});return original(h,k,0);}
+},'uint',['uint','uint','uint']);
+Interceptor.replace(address,callback);
+Interceptor.flush();
+const result=apply(handle,kind,lastIndex);
+if(result!==0){Interceptor.revert(address);throw new Error('initial curve write failed');}
+log({event:'ready',pid:Process.id,initial:lastIndex,version:1});
+const timer=setInterval(()=>{
+  if(access(flagPointer,0)===0)return;
+  active=false;Interceptor.revert(address);Interceptor.flush();
+  const status=original(handle,kind,lastIndex);
+  log({event:'reverted',index:lastIndex,status});
+  clearInterval(timer);
+},1000);

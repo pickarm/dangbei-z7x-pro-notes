@@ -27,6 +27,7 @@ namespace ProjectorDisplay {
         static readonly string SettingsFile=System.IO.Path.Combine(DataDir,"router-settings.json");
         static readonly string StatusFile=System.IO.Path.Combine(DataDir,"router-status.json");
         static readonly string LogFile=System.IO.Path.Combine(DataDir,"router.log");
+        static readonly string ModeStoreFile=System.IO.Path.Combine(DataDir,"display-mode-profiles.json");
         const string MutexName=@"Local\CodexProjectorDisplayRouter";
         const string StopName=@"Local\CodexProjectorDisplayRouterStop";
         static RouterSettings Settings;
@@ -34,6 +35,7 @@ namespace ProjectorDisplay {
         static UdpClient Client;
         static IPEndPoint Endpoint;
         static string LastLog="";
+        static string LastOutputMarker;
 
         static void Log(string text) {
             if(text==LastLog)return;LastLog=text;
@@ -111,34 +113,50 @@ namespace ProjectorDisplay {
             if(state==null)return "unknown";
             if(state.playing=="disabled")return "paused";
             if(state.playing=="0"&&state.source==Settings.systemSource)return "monitor";
+            // A cached HDMI source number alone does not prove that HDMI is being shown.
             if(Settings.computerSource!=-999&&state.source==Settings.computerSource&&
-               (state.playing=="1"||Settings.computerSource!=Settings.systemSource))return "projector";
+               state.playing=="1")return "projector";
             if(state.playing=="0")return "monitor";
             if(Settings.computerSource!=-999&&state.source!=Settings.computerSource)return "monitor";
-            return "uncalibrated";
+            return "monitor";
         }
         static void WriteStatus(LinkState state,string desired,string outcome) {
             var displays=Config.List().Where(d=>d.Available||d.Active).ToArray();
             File.WriteAllText(StatusFile,Json.Serialize(new{time=DateTime.Now.ToString("o"),
                 link=state,desired=desired,outcome=outcome,displays=displays}),Encoding.UTF8);
         }
-        static string Apply(string desired) {
+        static string Apply(string desired,bool persist=false) {
             var displays=Config.List();
             string marker=desired=="projector"?Settings.projectorMarker:Settings.monitorMarker;
             var available=displays.Where(d=>d.Available&&Matches(d,marker)).ToArray();
             if(available.Length!=1&&desired=="projector") {
                 marker=Settings.monitorMarker;available=displays.Where(d=>d.Available&&Matches(d,marker)).ToArray();
             }
-            if(available.Length!=1&&desired=="monitor") {
+            if(available.Length!=1) {
                 marker=Settings.laptopMarker;available=displays.Where(d=>d.Available&&Matches(d,marker)).ToArray();
             }
             if(available.Length!=1)return "kept-no-unique-target";
             var active=displays.Where(d=>d.Active).ToArray();
-            if(active.Length==1&&Matches(active[0],marker))return "already-correct";
-            Config.ProjectorOnly(marker,true);
+            if(active.Length==1&&Matches(active[0],marker)){
+                bool returning=LastOutputMarker!=null&&!String.Equals(LastOutputMarker,marker,StringComparison.OrdinalIgnoreCase);
+                LastOutputMarker=marker;
+                if(returning&&RestoreKnownMode(marker))return "restored-mode:"+(marker==Settings.monitorMarker?"monitor":"projector");
+                return "already-correct";
+            }
+            RememberMode();
+            Config.ProjectorOnly(marker,persist);
             active=Config.List().Where(d=>d.Active).ToArray();
             if(active.Length!=1||!Matches(active[0],marker))throw new InvalidOperationException("Display readback mismatch");
+            LastOutputMarker=marker;
             return "switched:"+(marker==Settings.projectorMarker?"projector":marker==Settings.monitorMarker?"monitor":"laptop");
+        }
+        static void RememberMode() {
+            try { Config.RememberCurrentMode(); }
+            catch(Exception error) { Log("Mode cache unavailable: "+error.GetType().Name+": "+error.Message); }
+        }
+        static bool RestoreKnownMode(string marker) {
+            try { Config.ForcePreferredMode(marker,false);return true; }
+            catch(Exception error) { Log("Preferred mode not applied: "+error.GetType().Name+": "+error.Message);return false; }
         }
         [STAThread] public static int Main(string[] args) {
             if(args.Contains("--stop")) {
@@ -149,7 +167,16 @@ namespace ProjectorDisplay {
             try {
                 Settings=Json.Deserialize<RouterSettings>(File.ReadAllText(SettingsFile,Encoding.UTF8));
                 Key=Convert.FromBase64String(Settings.key);if(Key.Length!=32)throw new InvalidOperationException("Invalid pairing");
-                if(args.Contains("--monitor-only")){string outcome=Apply("monitor");WriteStatus(null,"monitor",outcome);return 0;}
+                try { Config.ConfigureModeStore(ModeStoreFile); }
+                catch(Exception error) { Log("Mode cache could not be loaded: "+error.GetType().Name+": "+error.Message); }
+                if(args.Contains("--monitor-only")){
+                    RememberMode();
+                    RestoreKnownMode(Settings.monitorMarker);
+                    string outcome=Apply("monitor",true);
+                    var monitor=Config.List().FirstOrDefault(d=>d.Active&&Matches(d,Settings.monitorMarker));
+                    if(monitor!=null)Config.ProjectorOnly(Settings.monitorMarker,true);
+                    WriteStatus(null,"monitor",outcome);return 0;
+                }
                 using(Client=new UdpClient(new IPEndPoint(IPAddress.Any,0))) {
                     Client.EnableBroadcast=true;
                     if(probe){var state=Query();WriteStatus(state,Desired(state),"probe-only");return state==null?2:0;}
@@ -158,15 +185,19 @@ namespace ProjectorDisplay {
                         if(!created)return 0;
                         using(var stop=new EventWaitHandle(false,EventResetMode.ManualReset,StopName)) {
                             stop.Reset();Log("Started LAN display routing; no ADB dependency");
-                            string candidate="";int stable=0;DateTime lastGood=DateTime.UtcNow;
+                            RememberMode();
+                            RestoreKnownMode(Settings.monitorMarker);
+                            // Start with a usable local screen before waiting for the network.
+                            Log("Startup safety: "+Apply("monitor"));
+                            string candidate="";int stable=0;DateTime started=DateTime.UtcNow;
                             while(!stop.WaitOne(0)) {
                                 try {
                                     var state=Query();string desired=Desired(state);
-                                    if(state!=null)lastGood=DateTime.UtcNow;
-                                    if(desired=="unknown"&&(DateTime.UtcNow-lastGood).TotalSeconds>=15)desired="monitor";
+                                    if(desired=="unknown"||desired=="uncalibrated")desired="monitor";
+                                    if((DateTime.UtcNow-started).TotalSeconds<10&&desired=="projector")desired="monitor";
                                     if(desired==candidate)stable++;else{candidate=desired;stable=1;}
                                     string outcome="waiting-for-stable-source";
-                                    if((desired=="monitor"||desired=="projector")&&(stable>=2||once))outcome=Apply(desired);
+                                    if(desired=="monitor"||(desired=="projector"&&(stable>=3||once)))outcome=Apply(desired);
                                     WriteStatus(state,desired,outcome);
                                     Log(desired+" "+outcome+(state==null?"":" source="+state.playing+":"+state.source));
                                     if(once)return 0;

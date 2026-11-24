@@ -1,0 +1,17 @@
+{
+  "date": "2026-11-24",
+  "computer_input": "HDMI 2",
+  "computer_source": 2,
+  "system_source": 0,
+  "verified_states": [
+    {"playing": "1", "source": 2, "output": "projector only"},
+    {"playing": "0", "source": 0, "output": "external monitor only"}
+  ],
+  "external_monitor": {"width": 2560, "height": 1440, "refresh_numerator": 279961, "refresh_denominator": 1000},
+  "projector_mode_recorded": {"width": 3840, "height": 2160, "refresh_numerator": 60, "refresh_denominator": 1},
+  "user_confirmed_roundtrip": true,
+  "user_confirmed_refresh_preserved": true,
+  "background_restart_readback_verified": true,
+  "windows_reboot_tested_this_round": false,
+  "note": "Readbacks omit addresses, pairing data, complete device paths and raw display snapshots. Failure recovery is covered by offline tests, not simulated GPU failures on the live computer."
+}

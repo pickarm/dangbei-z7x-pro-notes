@@ -1,0 +1,14 @@
+{
+  "tested_on": "2026-11-08",
+  "speaker_path": {"handle": "0x17000001", "kind": 4},
+  "legacy_settled_gain_words": {"5": [-50, -500], "6": [-58, -500]},
+  "sample_delays_ms": [0, 100, 500, 1500, 2500],
+  "replacement_curve": {"index_1_db": -75, "index_100_db": 0, "index_0": "original mute path", "hardware_quantization_db": 0.125},
+  "replacement_readback_words": {"29": [-53, -750], "30": [-53, 0]},
+  "listening_confirmed": true,
+  "full_reboots_verified": 2,
+  "restored_indices_after_reboot": [29, 30],
+  "mute_during_loading_verified": true,
+  "shutdown_broadcast_mute": "removed: vendor reboot did not deliver the expected broadcast",
+  "note": "Native gain readback and user listening confirmation; not a microphone SPL or content loudness measurement."
+}

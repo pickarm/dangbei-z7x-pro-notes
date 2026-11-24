@@ -4,7 +4,9 @@
 
 ## 音量
 
-当前方案是“专用键位文件 + 无障碍服务”一组。恢复顺序：
+已持久化内置喇叭曲线的本机，使用 root 执行 `sh /data/local/codex-volume/disable.sh`。脚本先静音，再关闭加载并撤销曲线，完成后保持静音。旧曲线在同一数字档位可能更响，恢复原始映射后从低档慢慢上调。不要在有声音时直接删除启用标记。
+
+恢复原厂遥控键位按以下顺序进行。
 
 1. 确认仍能使用 ADB 或其他控制方式。
 2. 如原来有 IDC，恢复原 IDC；否则移除本次新增的专用 IDC。
@@ -18,6 +20,10 @@
 
 `HomeConfig undo` 清除对第三方桌面写入的持久偏好；同时关闭自写工具的开机桌面补充切换。不要误清普通用户设置或整个 PackageManager 数据库。
 
+如本机已单独停用原厂 HOME/LAUNCHER 的 SplashActivity，恢复该组件保存的原状态。本机原值为 `DEFAULT=0`。组件级恢复保留其他 PackageManager 设置。
+
+包级调度覆盖文件如果是本次独立创建的，恢复时按原文件有无的备份还原，或移除这次为 `local.tvkeys` 加的单条规则。将系统设置 `codex_home_guard_enabled` 设为 0 可关闭针对 Etna 的独立防护。
+
 本机厂商后台总开关原值为 true，恢复时可回到原值；没有要求其他设备一律设成 true。独立名单和系统正常回收是另一层机制。
 
 ## 语音
@@ -28,9 +34,9 @@
 
 ## 屏幕联动
 
-电脑程序支持 `--stop` 停止当前后台，`--monitor-only` 按本地配置恢复电脑显示器。
+本机从 `C:\ProgramData\CodexProjectorDisplayRouter` 运行 `Disable-Display-Router.ps1 -RestoreMonitor` 来停用计划任务、停止现有进程并恢复显示器。此操作按本地配置选定显示器并保存 Windows 安全基线。手动执行时，先停用 `CodexProjectorDisplayRouter` 计划任务，再用程序的 `--stop` 和 `--monitor-only`，以免每五分钟的触发器把进程补回来。
 
-完整停用应同时移除当前用户 Run 项 `CodexProjectorDisplayRouter`，否则下次登录又会启动。Android 端可以独立暂停联动，电脑保留当前布局。
+Windows Run 项属于旧部署，此机已移除。Android 端可以独立暂停联动，电脑保留收到暂停时的布局。
 
 配对配置必须自己生成并保存到私有目录，不提交到公开仓库。若完全卸载“遥控优化”，电脑侧也应停止后台，避免不断等待已不存在的状态服务。
 

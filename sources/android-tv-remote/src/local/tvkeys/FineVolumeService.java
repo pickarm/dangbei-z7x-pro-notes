@@ -6,6 +6,7 @@ import android.graphics.PixelFormat;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
+import android.os.SystemClock;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.InputDevice;
@@ -28,17 +29,23 @@ public final class FineVolumeService extends AccessibilityService {
     private int heldKey;
     private int handledDowns;
     private int lastVolume = -1;
+    private long lastPhysicalDown;
+    private int staleKeys;
     private boolean upCaptured, downCaptured;
     private final Runnable hide = new Runnable() { public void run() { removeOverlay(); } };
     private final Runnable repeat = new Runnable() { public void run() {
         if (heldKey == 0) return;
+        if (SystemClock.uptimeMillis()-lastPhysicalDown>1000) {
+            heldKey=0;
+            return;
+        }
         changeForKey(heldKey);
         handler.postDelayed(this, 120);
     }};
 
     @Override protected void onServiceConnected() { active = this; KeepAliveService.start(this, false); wm = (WindowManager)getSystemService(WINDOW_SERVICE); voiceLoader=new VoiceLoader(this);voiceLoader.start(); }
     @Override public void onAccessibilityEvent(AccessibilityEvent event) { }
-    @Override public void onInterrupt() { }
+    @Override public void onInterrupt() { heldKey=0;handler.removeCallbacks(repeat); }
     @Override public void onDestroy() { active = null; if(voiceLoader!=null)voiceLoader.stop();handler.removeCallbacksAndMessages(null); removeOverlay(); super.onDestroy(); }
     void refreshVoice(){if(voiceLoader!=null)voiceLoader.check();}
     @Override protected boolean onKeyEvent(KeyEvent event) {
@@ -54,11 +61,18 @@ public final class FineVolumeService extends AccessibilityService {
             return captured;
         }
         if (event.getAction() != KeyEvent.ACTION_DOWN) return captured;
+        // Never replay volume commands that waited while the process was suspended.
+        if (SystemClock.uptimeMillis()-event.getEventTime()>500) {
+            staleKeys++;
+            if(isUp)upCaptured=true;else downCaptured=true;
+            return true;
+        }
         if (event.getRepeatCount() == 0) {
             captured = true;
             if (isUp) upCaptured = captured; else downCaptured = captured;
         }
         if (!captured) return false;
+        lastPhysicalDown=event.getEventTime();
         if (event.getRepeatCount() == 0) {
             heldKey = key;
             handler.removeCallbacks(repeat);
@@ -110,6 +124,7 @@ public final class FineVolumeService extends AccessibilityService {
         out.println("FineVolumeService connected=" + (active == this));
         out.println("enabled=" + VolumeControl.enabled(this));
         out.println("handledDowns=" + handledDowns + " lastVolume=" + lastVolume);
+        out.println("staleKeysDropped="+staleKeys);
         out.println("current=" + VolumeControl.audio(this).getStreamVolume(3) + " max=" + VolumeControl.audio(this).getStreamMaxVolume(3));
     }
 }

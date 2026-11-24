@@ -2,7 +2,7 @@
 
 ## Google 组件和桌面入口
 
-Google 服务框架、Play 商店安装完成，但这只说明 APK 能安装、相关界面能启动，不代表投影仪获得了 Google 认证或流媒体播放认证。
+Google 服务框架和 Play 商店已安装，Play 商店能进入初始登录界面。登录曾在 `fonts.gstatic.com` 处失败，排查发现电脑侧本地加速工具改写 hosts 并返回自己的 TLS 证书。关闭该工具后，电脑代理对该域名的探测恢复。Google 登录和设备认证仍未验证。
 
 Apple TV 电视版安装后，原先桌面看不到入口。之后补了可在电视桌面显示的启动桥，实机能打开 Apple TV。包名为 `com.apple.atve.androidtv.appletv`。仓库不分发第三方 APK。
 
@@ -40,5 +40,9 @@ Keybox error: 25. Falling back to L3.
 安装 Google 框架不能修复 Widevine L1、密钥盒或可信环境。没有替换 DRM 证书、复制其他设备密钥或绕过授权，**没有完成正片成功播放验证**。
 
 诊断结束后卸载临时诊断应用、清理临时文件，代理恢复关闭。
+
+## 微信输入法
+
+两版官方 APK 中的原生库仅支持 arm64-v8a。另一个宣称支持 armeabi-v7a 的测试包缺少 32 位核心引擎，在本机初始化时崩溃。用户决定结束这项尝试，测试包已卸载，原搜狗电视输入法仍保留为默认。
 
 参考：[Google Widevine 设备集成说明](https://developers.google.com/widevine/drm/overview#ecosystem)。

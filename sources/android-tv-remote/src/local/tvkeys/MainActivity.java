@@ -54,7 +54,7 @@ public final class MainActivity extends Activity {
     private void update() {
         volume.setText("当前音量   "+VolumeControl.audio(this).getStreamVolume(3)+" / "+VolumeControl.audio(this).getStreamMaxVolume(3));
         boolean enabled=VolumeControl.enabled(this);
-        status.setText((FineVolumeService.active==null?"等待开启音量细调服务":enabled?"每次 1 格 · 后台服务正常":"每次 5 格 · 后台服务正常")+"\n语音增强："+VoiceLoader.status(this)+"\n电脑屏幕联动："+DisplayLink.status(this));
+        status.setText((FineVolumeService.active==null?"等待开启音量细调服务":enabled?"每次 1 格 · 后台服务正常":"每次 5 格 · 后台服务正常")+"\n音量曲线："+VolumeCurveLoader.status(this)+"\n语音增强："+VoiceLoader.status(this)+"\n电脑屏幕联动："+DisplayLink.status(this));
         toggle.setText(enabled?"切换为每次 5 格":"切换为每次 1 格");
         voiceToggle.setText(VoiceLoader.enabled(this)?"关闭语音增强":"开启语音增强");
         displayToggle.setText(DisplayLink.enabled(this)?"关闭电脑屏幕联动":"开启电脑屏幕联动");

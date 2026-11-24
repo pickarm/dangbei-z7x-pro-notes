@@ -8,8 +8,10 @@ import android.app.Service;
 import android.app.usage.UsageEvents;
 import android.app.usage.UsageStatsManager;
 import android.content.ComponentName;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -26,8 +28,18 @@ public final class KeepAliveService extends Service {
     private final Handler handler = new Handler();
     private String repairStatus = "starting", homeStatus = "not-requested";
     private int repairs;
-    private boolean homeScheduled;
+    private long homeDeadline;
+    private HomeGuardLoader homeGuard;
+    private VolumeCurveLoader volumeCurve;
     private DisplayLink displayLink;
+    private final BroadcastReceiver screenReceiver=new BroadcastReceiver(){
+        @Override public void onReceive(Context context,Intent intent){scheduleHome("screen-on");}
+    };
+    private final Runnable homeCheck=new Runnable(){public void run(){
+        if(SystemClock.elapsedRealtime()>=homeDeadline)return;
+        handOffHome(Settings.Global.getInt(getContentResolver(),"boot_count",-1));
+        if(SystemClock.elapsedRealtime()<homeDeadline)handler.postDelayed(this,3000);
+    }};
     private final Runnable maintenance = new Runnable() { public void run() {
         repairAccessibility();
         handler.postDelayed(this, 15000);
@@ -53,23 +65,28 @@ public final class KeepAliveService extends Service {
                 .setContentIntent(open).setOngoing(true).setShowWhen(false).build());
         handler.post(maintenance);
         displayLink=new DisplayLink(this);displayLink.start();
+        homeGuard=new HomeGuardLoader(this);homeGuard.start();
+        volumeCurve=new VolumeCurveLoader(this);volumeCurve.start();
+        IntentFilter screen=new IntentFilter(Intent.ACTION_SCREEN_ON);
+        screen.addAction(Intent.ACTION_USER_PRESENT);
+        registerReceiver(screenReceiver,screen);
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
         repairAccessibility();
-        // The boot count survives this service restarting. Never pull the user home later.
+        // Retry only during boot/wake; normal background service restarts never take focus.
         boolean afterBoot = (intent != null && intent.getBooleanExtra("boot", false)) ||
                 SystemClock.elapsedRealtime() < 180000;
-        if (afterBoot && !homeScheduled &&
-                Settings.System.getInt(getContentResolver(), "codex_boot_home_enabled", 1) == 1) {
-            final int boot = Settings.Global.getInt(getContentResolver(), "boot_count", -1);
-            if (boot >= 0 && getSharedPreferences("settings", 0).getInt("home_boot_done", -2) != boot) {
-                homeScheduled = true;
-                homeStatus = "scheduled";
-                handler.postDelayed(() -> handOffHome(boot), 8000);
-            }
-        }
+        if(afterBoot)scheduleHome("boot");
         return START_STICKY;
+    }
+
+    private void scheduleHome(String reason){
+        if(Settings.System.getInt(getContentResolver(),"codex_boot_home_enabled",1)!=1)return;
+        homeDeadline=SystemClock.elapsedRealtime()+120000;
+        homeStatus="scheduled-"+reason;
+        handler.removeCallbacks(homeCheck);
+        handler.postDelayed(homeCheck,3000);
     }
 
     private void repairAccessibility() {
@@ -99,6 +116,10 @@ public final class KeepAliveService extends Service {
 
     private void handOffHome(int boot) {
         try {
+            Process prop=new ProcessBuilder("/system/bin/getprop","vendor.xgimi.hdmi.playing.state").start();
+            java.io.BufferedReader reader=new java.io.BufferedReader(new java.io.InputStreamReader(prop.getInputStream()));
+            String hdmi=reader.readLine();reader.close();
+            if("1".equals(hdmi)){homeStatus="skipped-hdmi";homeDeadline=0;return;}
             UsageStatsManager manager = (UsageStatsManager)getSystemService(USAGE_STATS_SERVICE);
             long now = System.currentTimeMillis();
             UsageEvents events = manager.queryEvents(now - Math.min(SystemClock.elapsedRealtime(), 120000), now);
@@ -114,18 +135,23 @@ public final class KeepAliveService extends Service {
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
                 startActivity(launch);
                 homeStatus = "switched-to-dangbei";
-            } else homeStatus = HOME.equals(foreground) ? "already-dangbei" : "skipped-active-app";
-            if (foreground != null) getSharedPreferences("settings", 0).edit().putInt("home_boot_done", boot).apply();
-            else homeStatus = "usage-access-unavailable";
-        } catch (RuntimeException error) { homeStatus = error.getClass().getSimpleName(); }
+            } else if(HOME.equals(foreground)){
+                homeStatus="already-dangbei";
+                getSharedPreferences("settings",0).edit().putInt("home_boot_done",boot).apply();
+            } else if(foreground==null||foreground.equals("com.android.systemui")||foreground.equals("com.dangbei.bootguide")){
+                homeStatus="waiting-for-home";
+            } else {homeStatus="skipped-active-app:"+foreground;}
+        } catch (Exception error) { homeStatus = error.getClass().getSimpleName(); }
     }
 
     @Override public void onTaskRemoved(Intent intent) { repairAccessibility(); super.onTaskRemoved(intent); }
-    @Override public void onDestroy() { if(displayLink!=null)displayLink.stop();handler.removeCallbacksAndMessages(null); super.onDestroy(); }
+    @Override public void onDestroy() { unregisterReceiver(screenReceiver);if(homeGuard!=null)homeGuard.stop();if(volumeCurve!=null)volumeCurve.stop();if(displayLink!=null)displayLink.stop();handler.removeCallbacksAndMessages(null); super.onDestroy(); }
     @Override public IBinder onBind(Intent intent) { return null; }
     @Override protected void dump(FileDescriptor fd, PrintWriter out, String[] args) {
         out.println("KeepAliveService foreground=true accessibility=" + repairStatus + " repairs=" + repairs);
         out.println("bootHome=" + homeStatus);
+        out.println("homeGuard="+Settings.System.getString(getContentResolver(),"codex_home_guard_status"));
+        out.println("volumeCurve="+Settings.System.getString(getContentResolver(),"codex_volume_curve_status"));
         if(displayLink!=null)out.println(displayLink.diagnostic());
     }
 }

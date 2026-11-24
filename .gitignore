@@ -18,6 +18,8 @@
 
 # Credentials, pairing, signing, raw snapshots
 **/router-settings.json
+**/router-settings.*.json
+**/display-mode-profiles.json
 **/display-pair.json
 **/display-pair.json.*
 **/.local-signing/
